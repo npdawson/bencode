@@ -127,8 +127,6 @@ decode_string :: proc(input: ^bytes.Reader) -> string {
     }
     length := strconv.atoi(transmute(string)length_str[:])
     str := make([]u8, length)
-    // not sure about needing to free the memory, does transmute(string) give a copy or a reference?
-    defer delete(str)
 
     n: int
     n, err = bytes.reader_read(input, str)
