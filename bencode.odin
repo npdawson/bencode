@@ -2,10 +2,27 @@ package bencode
 
 import "core:bytes"
 import "core:fmt"
+import "core:os"
 import "core:strconv"
 
 // probably don't need a main, but it's here for testing
 main :: proc() {
+    if len(os.args) == 1 {
+        fmt.println("Please specify a file to parse")
+        return
+    } else if len(os.args) > 2 {
+        fmt.println("Too many arguments")
+        return
+    }
+    filename := os.args[1]
+    data, ok := os.read_entire_file(filename)
+    if !ok {
+        fmt.println("error reading file")
+        return
+    }
+    r := bytes.Reader{s = data, i = 0, prev_rune = -1}
+    result := decode1(&r)
+    fmt.println(result)
 }
 
 Value :: union {
@@ -103,6 +120,10 @@ decode_string :: proc(input: ^bytes.Reader) -> string {
     for next != ':' {
         append(&length_str, next)
         next, err = bytes.reader_read_byte(input)
+        if err != .None {
+            fmt.println("string length read error: ", err)
+            return ""
+        }
     }
     length := strconv.atoi(transmute(string)length_str[:])
     str := make([]u8, length)
