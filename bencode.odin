@@ -29,6 +29,11 @@ encode1 :: proc(val: Value, allocator := context.allocator) -> []u8 {
     return bcode
 }
 
+decode :: proc(data: []byte, allocator := context.allocator) -> Value {
+    reader := bytes.Reader{s = data, i = 0, prev_rune = -1}
+    return decode1(&reader, allocator)
+}
+
 decode1 :: proc(input: ^bytes.Reader, allocator := context.allocator) -> Value {
 	val: Value
     next := input.s[input.i]
