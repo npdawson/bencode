@@ -35,33 +35,33 @@ Value :: union {
 }
 
 // TODO: proc overloading instead of switch statement?
-encode1 :: proc(val: Value) -> []u8 {
-    bcode: []u8
+encode1 :: proc(val: Value, allocator := context.allocator) -> []u8 {
+    bcode := make([]u8, 0, allocator = allocator)
     switch v in val {
         case string:
-            bcode = encode_string(v)
+            bcode = encode_string(v, allocator)
         case int:
-            bcode = encode_int(v)
+            bcode = encode_int(v, allocator)
         case []Value:
-            bcode = encode_list(v)
+            bcode = encode_list(v, allocator)
         case map[string]Value:
-            bcode = encode_dict(v)
+            bcode = encode_dict(v, allocator)
     }
     return bcode
 }
 
-decode1 :: proc(input: ^bytes.Reader) -> Value {
+decode1 :: proc(input: ^bytes.Reader, allocator := context.allocator) -> Value {
 	val: Value
     next := input.s[input.i]
 	switch next {
         case 'd':
-            val = decode_dict(input)
+            val = decode_dict(input, allocator)
         case 'l':
-            val = decode_list(input)
+            val = decode_list(input, allocator)
         case '0' ..= '9':
-            val = decode_string(input)
+            val = decode_string(input, allocator)
         case 'i':
-            val = decode_int(input)
+            val = decode_int(input, allocator)
         case:
             fmt.println("invalid bencode: ", next)
             return nil
@@ -70,18 +70,18 @@ decode1 :: proc(input: ^bytes.Reader) -> Value {
 	return val
 }
 
-encode_dict :: proc(d: map[string]Value) -> []u8 {
-    data: [dynamic]u8
+encode_dict :: proc(d: map[string]Value, allocator := context.allocator) -> []u8 {
+    data := make([dynamic]u8, allocator = allocator)
 
-    keys, err := slice.map_keys(d)
+    keys, err := slice.map_keys(d, allocator)
     slice.sort(keys)
 
     append(&data, 'd')
 
     for key in keys {
-        k := encode_string(key)
+        k := encode_string(key, allocator)
         append(&data, ..k)
-        v := encode1(d[key])
+        v := encode1(d[key], allocator)
         append(&data, ..v)
     }
 
@@ -90,13 +90,12 @@ encode_dict :: proc(d: map[string]Value) -> []u8 {
     return data[:]
 }
 
-decode_dict :: proc(input: ^bytes.Reader) -> map[string]Value {
-	dict := make(map[string]Value)
+decode_dict :: proc(input: ^bytes.Reader, allocator := context.allocator) -> map[string]Value {
+	dict := make(map[string]Value, allocator = allocator)
 
     d, err := bytes.reader_read_byte(input)
     if err != .None || d != 'd' {
         fmt.println("dict decode error: ", err, ", d = ", d)
-        delete(dict)
         return nil
     }
 
@@ -104,8 +103,8 @@ decode_dict :: proc(input: ^bytes.Reader) -> map[string]Value {
     val: Value
 
     for input.s[input.i] != 'e' {
-        key = decode_string(input)
-        val = decode1(input)
+        key = decode_string(input, allocator)
+        val = decode1(input, allocator)
         dict[key] = val
     }
 
@@ -113,20 +112,19 @@ decode_dict :: proc(input: ^bytes.Reader) -> map[string]Value {
     e, err = bytes.reader_read_byte(input)
     if err != .None || e != 'e' {
         fmt.println("dict decode error: ", err, ", e = ", e)
-        delete(dict)
         return nil
     }
 
 	return dict
 }
 
-encode_list :: proc(list: []Value) -> []u8 {
-    data: [dynamic]u8
+encode_list :: proc(list: []Value, allocator := context.allocator) -> []u8 {
+    data := make([dynamic]u8, allocator = allocator)
 
     append(&data, 'l')
 
     for value in list {
-        v := encode1(value)
+        v := encode1(value, allocator)
         append(&data, ..v)
     }
 
@@ -135,8 +133,8 @@ encode_list :: proc(list: []Value) -> []u8 {
     return data[:]
 }
 
-decode_list :: proc(input: ^bytes.Reader) -> []Value {
-	list := make([dynamic]Value)
+decode_list :: proc(input: ^bytes.Reader, allocator := context.allocator) -> []Value {
+	list := make([dynamic]Value, allocator = allocator)
 
     l, err := bytes.reader_read_byte(input)
     if err != .None || l != 'l' {
@@ -147,7 +145,7 @@ decode_list :: proc(input: ^bytes.Reader) -> []Value {
 
     val: Value
     for input.s[input.i] != 'e' {
-        val = decode1(input)
+        val = decode1(input, allocator)
         append(&list, val)
     }
 
@@ -162,8 +160,8 @@ decode_list :: proc(input: ^bytes.Reader) -> []Value {
 	return list[:]
 }
 
-encode_string :: proc(str: string) -> []u8 {
-    data: [dynamic]u8
+encode_string :: proc(str: string, allocator := context.allocator) -> []u8 {
+    data := make([dynamic]u8, allocator = allocator)
 
     length := len(str)
     ldata: [20]u8
@@ -177,7 +175,7 @@ encode_string :: proc(str: string) -> []u8 {
     return data[:]
 }
 
-decode_string :: proc(input: ^bytes.Reader) -> string {
+decode_string :: proc(input: ^bytes.Reader, allocator := context.allocator) -> string {
     length_str: [dynamic]u8
     defer delete(length_str)
 
@@ -195,7 +193,7 @@ decode_string :: proc(input: ^bytes.Reader) -> string {
         }
     }
     length := strconv.atoi(transmute(string)length_str[:])
-    str := make([]u8, length)
+    str := make([]u8, length, allocator = allocator)
 
     n: int
     n, err = bytes.reader_read(input, str)
@@ -207,8 +205,8 @@ decode_string :: proc(input: ^bytes.Reader) -> string {
     return transmute(string)str
 }
 
-encode_int :: proc(i: int) -> []u8 {
-    data: [dynamic]u8
+encode_int :: proc(i: int, allocator := context.allocator) -> []u8 {
+    data := make([dynamic]u8, allocator = allocator)
 
     append(&data, 'i')
 
@@ -221,16 +219,14 @@ encode_int :: proc(i: int) -> []u8 {
     return data[:]
 }
 
-decode_int :: proc(input: ^bytes.Reader) -> int {
-
+decode_int :: proc(input: ^bytes.Reader, allocator := context.allocator) -> int {
     i, err := bytes.reader_read_byte(input)
     if err != .None || i != 'i' {
         fmt.println("dict decode error: ", err, ", i = ", i)
         return -1
     }
 
-	digits := make([dynamic]u8)
-    defer delete(digits)
+	digits := make([dynamic]u8, allocator = allocator)
     for input.s[input.i] != 'e' {
         digit, err := bytes.reader_read_byte(input)
         append(&digits, digit)
