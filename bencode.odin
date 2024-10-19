@@ -6,27 +6,6 @@ import "core:os"
 import "core:slice"
 import "core:strconv"
 
-// probably don't need a main, but it's here for testing
-main :: proc() {
-    if len(os.args) == 1 {
-        fmt.println("Please specify a file to parse")
-        return
-    } else if len(os.args) > 2 {
-        fmt.println("Too many arguments")
-        return
-    }
-    filename := os.args[1]
-    data, ok := os.read_entire_file(filename)
-    if !ok {
-        fmt.println("error reading file")
-        return
-    }
-    r := bytes.Reader{s = data, i = 0, prev_rune = -1}
-    result := decode1(&r)
-    out := encode1(result)
-    os.write_entire_file("output.txt", out)
-}
-
 Value :: union {
 	string,
 	int,
